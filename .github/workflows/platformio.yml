@@ -1,0 +1,53 @@
+name: PlatformIO
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: platformio-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build XIAO ESP32-C6
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+            ~/.platformio/packages
+            ~/.platformio/platforms
+          key: ${{ runner.os }}-pio-6.2.0-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-6.2.0-
+
+      - name: Install PlatformIO
+        run: pip install --upgrade "platformio==6.2.0"
+
+      - name: Build firmware
+        run: pio run -e seeed_xiao_esp32c6
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: simon-8.4.0-xiao-esp32c6
+          path: |
+            .pio/build/seeed_xiao_esp32c6/firmware.bin
+            .pio/build/seeed_xiao_esp32c6/firmware.elf
+            .pio/build/seeed_xiao_esp32c6/bootloader.bin
+            .pio/build/seeed_xiao_esp32c6/partitions.bin
+          if-no-files-found: error
