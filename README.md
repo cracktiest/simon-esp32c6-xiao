@@ -183,6 +183,88 @@ Setelah trim, pulsa LOW yang masih panjang tidak menjadi trim kedua. Sensor haru
 
 LCD berganti setiap 3 detik: operator dan proses, state serta waktu, stitch dan RFID, lalu status Zigbee dan NIK. Hasil trim ditahan sekitar 2,5 detik. Sebelum join, layar menampilkan `ZB JOINING...` atau `ERR PERMIT JOIN`. Saat rejoin, layar menampilkan `ZB REJOINING...`.
 
+## Rangkaian dan PCB
+
+Carrier board digambar di Altium. Berkas aslinya [`Gistex (1).pdf`](<Gistex%20(1).pdf>): halaman 1 skematik, halaman 2 layout PCB, halaman 3 ukuran cetak 1:1. XIAO ESP32-C6 ditancapkan pada soket. Antena Zigbee tetap di konektor U.FL modul XIAO. Konektor `ANT` pada PCB ini adalah kumparan RFID 125 kHz, bukan antena Zigbee.
+
+GPIO3 dan GPIO14 tidak keluar ke carrier, jadi sakelar antena eksternal pada modul tidak tertutup jejak papan ini.
+
+### Skematik
+
+Empat kotak dari kiri ke kanan: modul dan header tombol, catu daya plus LCD, RFID, lalu sensor, buzzer, dan konektor luar.
+
+![Skematik carrier SIMON](docs/hardware/schematic.png)
+
+**Modul XIAO dan header tombol.** Pin kiri atas ke bawah: D0, D1, D2, D3, D4, D5, D6. Pin kanan atas ke bawah: 5V, GND, 3V3, D10, D9, D8, D7. D0 dan D6 tidak disambung. Firmware hanya menerima data RFID, jadi TX modul (D6) tidak dipakai.
+
+Header `BUTTN` lima pin disediakan untuk tombol atau sensor lain. Firmware `SENSOR_TYPE 1` tidak membaca header ini.
+
+| Pin header | Net |
+|---|---|
+| 1 | D10 |
+| 2 | D9 |
+| 3 | D8 |
+| 4 | D3 |
+| 5 | GND |
+
+![Soket XIAO dan header tombol](docs/hardware/sch-mcu.png)
+
+**Catu daya dan LCD.** Masukan papan 12 V. Modul step-down MP1584EN menerima 5–26 V dan mengeluarkan 5 V untuk pin 5V XIAO, LCD, dan RDM6300. Keluaran 3,3 V XIAO hanya menarik pull-up sensor.
+
+| Pin modul MP1584 | Net |
+|---|---|
+| 1 IN− | GND |
+| 2 IN+ | 12 V |
+| 3 OUT− | GND |
+| 4 OUT+ | 5 V |
+
+Konektor LCD pada skematik adalah `LCD2004-I2C-GREEN` (20×4). Urutannya GND, 5 V, SDA ke D4, SCL ke D5. Firmware saat ini menggambar layar 16×2 di alamat `0x27`. Hubungan I2C-nya sama, tetapi program hanya memakai 16 kolom dan 2 baris.
+
+![Step-down MP1584 dan konektor LCD](docs/hardware/sch-power-lcd.png)
+
+**RFID RDM6300.** Modul diberi 5 V pada pin 5. Pin 4 dan pin 8 ke GND. Pin RX, VCC, dan LED modul tidak disambung. TX modul (taraf 5 V) masuk ke D7 lewat pembagi 10 kΩ seri dan 20 kΩ ke GND, sehingga pin ESP menerima sekitar 3,3 V saat garis TX tinggi dan 0 V saat rendah. ANT1 dan ANT2 menuju konektor kumparan.
+
+![RDM6300 dan pembagi tingkat TX](docs/hardware/sch-rfid.png)
+
+**Sensor, buzzer, dan konektor luar.** E3Z-R61 adalah sensor fotolistrik retro-reflektif Omron, keluaran NPN, disuplai 12 V langsung dari masukan papan. Keluaran tidak masuk 12 V ke ESP: ada resistor seri 1 kΩ ke D1 dan pull-up 4,7 kΩ dari simpul itu ke 3,3 V. Saat objek memutus sinar, keluaran NPN menarik D1 ke LOW. Itu sama dengan `SENSOR_PIN` GPIO1 active LOW di firmware.
+
+| Pin JST sensor | Fungsi pada skematik |
+|---|---|
+| 1 | Keluaran, lewat 1 kΩ ke D1 |
+| 2 | GND |
+| 3 | +12 V |
+
+Kabel standar E3Z biasanya cokelat +12 V, biru GND, dan hitam keluaran. Cocokkan warna itu dengan nomor pin di atas sebelum mesin dijalankan.
+
+Buzzer dua pin: sisi positif ke D2, sisi lain ke GND. Firmware menyalakannya dengan HIGH selama 100 ms, jadi buzzer yang dipasang adalah buzzer aktif.
+
+| Konektor | Pin 1 | Pin 2 |
+|---|---|---|
+| `12V_IN` | GND | +12 V |
+| `ANT` | ANT2 | ANT1 |
+
+![Sensor E3Z-R61, buzzer, antena RFID, dan masukan 12 V](docs/hardware/sch-sensor.png)
+
+Jangan menghidupkan catu 12 V bersamaan dengan USB jika kedua sumber sama-sama mengisi pin 5 V XIAO.
+
+### Layout PCB
+
+Bidang biru adalah ground. Jejak merah adalah jalur 12 V dan 5 V. Jejak lainnya adalah sinyal.
+
+Penempatan, dilihat pada gambar:
+
+- Empat lubang mounting di sudut.
+- Atas: buzzer, konektor LCD (`GND`, `+5V`, `D4`, `D5`), masukan 12 V, dan konektor kumparan RFID.
+- Kiri: soket E3Z-R61 (`+12V`, `GND`, `D1`) dan header tombol (`D3`, `D8`, `D9`, `D10`, `GND`).
+- Tengah: tapak modul MP1584, resistor 1 kΩ dan 4,7 kΩ di jalur sensor, resistor 10 kΩ dan 20 kΩ di jalur TX RFID, serta soket XIAO.
+- Kanan: header RDM6300 (`5V`, `GND`, `RX`, `TX`, `VCC`, `LED`). Daerah di kanan header sengaja longgar untuk kumparan. Tulisan pada silkscreen adalah `g-dev/rizkisembiring`.
+
+![Layout PCB carrier SIMON](docs/hardware/pcb.png)
+
+Halaman ketiga PDF adalah gambar ukuran asli. Cetak pada skala 100 persen, tanpa “fit to page”, lalu tempelkan kertas itu pada papan atau panel untuk memeriksa jarak lubang dan konektor.
+
+![PCB skala 1:1 untuk cek ukuran di kertas](docs/hardware/pcb-actual-size.png)
+
 ## Join Zigbee
 
 Perangkat baru memindai kanal 11–26 dan butuh Permit Join. Join pertama menyimpan `zb_registered` di NVS. Boot berikutnya rejoin ke kanal 11 tanpa Permit Join. Jika NVRAM jaringan rusak, firmware menghapus flag itu lalu restart dan commissioning ulang.
